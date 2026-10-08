@@ -122,7 +122,7 @@ flowchart LR
     class Response outputNode
 
     %% Subgraph styling
-    classDef subgraphStyle fill:#f8fafc,stroke:#334155,stroke-width:2px
+    classDef subgraphStyle fill:#1e293b,stroke:#64748b,stroke-width:2px,color:#ffffff
     class retrieval,reranking,generation subgraphStyle
 ```
 

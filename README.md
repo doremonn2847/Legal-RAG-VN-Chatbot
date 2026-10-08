@@ -9,7 +9,7 @@ A Retrieval-Augmented Generation (RAG) system designed to answer legal questions
 ## **Features**
 
 - **Hybrid RAG Architecture** - Combines Vietnamese dense embeddings, BM25 keyword search, and BGE cross-encoder reranking.
-- **Original-Query Retrieval** - Uses the user's question directly; query refinement is disabled to avoid introducing unsupported article references.
+- **Raw Retrieval** - Uses the user's question directly; query refinement is disabled as real experiments proved against it.
 - **Top-5 Evidence** - Retrieves 25 sparse and 25 dense candidates, deduplicates them, and selects five articles after reranking and score fusion.
 - **Local Qwen Inference** - Generates answers through `langchain-ollama`, with `qwen3.5:9b` as the default model and no hosted inference API key required.
 - **FastAPI + Gradio** - Serves questions through a validated HTTP API and a local chat interface with source excerpts.

@@ -1,0 +1,15 @@
+*
+!Dockerfile
+!requirements.txt
+!requirements-ui.txt
+!api.py
+!app.py
+!config.py
+!main/
+!main/**
+!utils/
+!utils/**
+!css/
+!css/**
+**/__pycache__/
+**/*.pyc

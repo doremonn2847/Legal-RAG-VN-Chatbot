@@ -1,0 +1,2 @@
+# Ollama is now included in the application requirements.
+-r requirements.txt

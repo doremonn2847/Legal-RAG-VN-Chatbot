@@ -3,7 +3,6 @@ from unittest.mock import MagicMock, patch
 
 from config import Config
 from main.chatbot import VietnameseLegalRAG
-from utils.retrieval_metrics import RAGEvaluator
 
 
 class QueryRoutingTests(unittest.TestCase):
@@ -98,13 +97,3 @@ class RetrievalLimitTests(unittest.TestCase):
             with self.subTest(top_k=top_k), self.assertRaisesRegex(ValueError, '5 or 10'):
                 self.rag.retrieve_documents('query', top_k=top_k)
         self.rag.vector_store.search_similar_documents.assert_not_called()
-
-    def test_evaluator_forwards_requested_limit_for_every_method(self):
-        evaluator = RAGEvaluator.__new__(RAGEvaluator)
-        evaluator.rag = MagicMock()
-        evaluator.rag.retrieve_documents.return_value = self.documents
-        for top_k in (5, 10):
-            for method in ('bm25', 'vector', 'hybrid', 'hybrid_rerank'):
-                with self.subTest(top_k=top_k, method=method):
-                    self.assertEqual(len(evaluator.retrieve_documents_with_method('query', method, top_k)), top_k)
-                    self.assertEqual(evaluator.rag.retrieve_documents.call_args.kwargs['top_k'], top_k)

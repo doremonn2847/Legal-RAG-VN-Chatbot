@@ -1,7 +1,5 @@
-from typing import List, Dict, Any, Tuple
-import numpy as np
+from typing import List, Dict, Any
 from sentence_transformers import CrossEncoder
-import logging
 from config import Config
 from utils.telemetry import trace_stage
 

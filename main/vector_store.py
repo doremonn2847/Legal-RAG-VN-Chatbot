@@ -1,6 +1,6 @@
 import os
 import uuid
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance,
@@ -11,7 +11,6 @@ from qdrant_client.models import (
     MatchValue,
 )
 from sentence_transformers import SentenceTransformer
-import numpy as np
 from config import Config
 from tqdm import tqdm
 

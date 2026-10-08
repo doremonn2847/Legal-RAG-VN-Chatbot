@@ -480,9 +480,6 @@ Nội dung: {content}
         if self._is_negative_response(answer) and use_fallback:
             print("🔍 Detected insufficient information response, activating search tools...")
             
-            # Inform user that search is being performed
-            search_notification = f"\n\n*🔍 Đang tìm kiếm thông tin bổ sung để trả lời câu hỏi của bạn...*"
-            
             # Try Google search if enabled
             if Config.ENABLE_GOOGLE_SEARCH:
                 print("📡 Trying web search...")

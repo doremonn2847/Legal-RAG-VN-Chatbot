@@ -20,7 +20,6 @@ with ZipFile(buffer, "w", compression=ZIP_DEFLATED) as archive:
 payload = buffer.getvalue()
 encoded = base64.b64encode(payload).decode()
 digest = hashlib.sha256(payload).hexdigest()
-revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
 cells = []
 
 def markdown(text):
@@ -35,21 +34,19 @@ markdown("""# Build the Vietnamese legal vector index on a Colab GPU
 
 In VS Code choose **Select Kernel → Colab**, sign in, and connect to a **GPU** runtime (a T4 is sufficient). Then run the cells in order.
 
-This notebook clones the original repository and overlays a verified snapshot of our current local changes. It embeds no `.env`, API key, model weights, or dataset. No inference API key is needed for indexing.
+This notebook restores a verified snapshot of the project source. It embeds no `.env`, API key, model weights, or dataset. No inference API key is needed for indexing.
 
 The result is `colab_vector_index.zip`, containing the complete portable Qdrant index and a build manifest. Download it through the Colab file browser or the final download cell. On your local machine, stop the chatbot and run `python import_vector_index.py <downloaded zip path>`. The existing partial index is backed up. The separately built local BM25 index is retained.
 """)
 code(f'''
 from pathlib import Path
-import base64, hashlib, io, os, subprocess, zipfile
+import base64, hashlib, io, os, zipfile
 SOURCE_SHA256 = {digest!r}
 SOURCE_BASE64 = {encoded!r}
 source = base64.b64decode(SOURCE_BASE64)
 assert hashlib.sha256(source).hexdigest() == SOURCE_SHA256
 REPO = Path("/content/vietnamese-legal-chatbot")
-if not REPO.exists():
-    subprocess.run(["git", "clone", "https://github.com/fisherman611/vietnamese-legal-chatbot.git", str(REPO)], check=True)
-    subprocess.run(["git", "checkout", {revision!r}], cwd=REPO, check=True)
+REPO.mkdir(parents=True, exist_ok=True)
 with zipfile.ZipFile(io.BytesIO(source)) as archive:
     archive.extractall(REPO)
 os.chdir(REPO)

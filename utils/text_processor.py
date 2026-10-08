@@ -1,5 +1,4 @@
 import re
-import pandas as pd
 from typing import List, Set
 from underthesea import word_tokenize
 from config import Config

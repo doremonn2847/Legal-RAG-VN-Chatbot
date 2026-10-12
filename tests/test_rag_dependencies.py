@@ -19,6 +19,7 @@ from utils.question_refiner import VietnameseLegalQuestionRefiner
 class OllamaIntegrationTests(unittest.TestCase):
     def test_generation_and_legacy_helpers_use_ollama(self):
         with (
+            patch.object(Config, "INFERENCE_PROVIDER", "ollama"),
             patch("main.chatbot.QdrantVectorStore"),
             patch("main.chatbot.BM25Retriever"),
             patch("main.chatbot.DocumentReranker"),
@@ -55,11 +56,10 @@ class OllamaIntegrationTests(unittest.TestCase):
 class ArticleLimitTests(unittest.TestCase):
     def test_generation_keeps_characters_after_old_limit(self):
         rag = VietnameseLegalRAG.__new__(VietnameseLegalRAG)
-        text = "a" * 600 + "QUYỀN_LỢI" + "b" * 500
+        text = "a" * 2100 + "QUYỀN_LỢI" + "b" * 500
         context = rag.format_context([{"content": text}])
         self.assertIn("QUYỀN_LỢI", context)
-        self.assertIn(text[:1000] + "...", context)
-        self.assertNotIn(text[:1001], context)
+        self.assertIn(text, context)
 
     def test_exactly_1000_characters_is_not_truncated(self):
         rag = VietnameseLegalRAG.__new__(VietnameseLegalRAG)
@@ -68,22 +68,22 @@ class ArticleLimitTests(unittest.TestCase):
         self.assertIn(text, context)
         self.assertNotIn("...", context)
 
-    def test_bge_receives_1000_characters_and_orders_documents(self):
-        with patch("main.reranker.CrossEncoder") as encoder:
+    def test_bge_receives_full_article_and_orders_documents(self):
+        with patch.object(Config, "RERANK_PROVIDER", "local"), patch("main.reranker.CrossEncoder") as encoder:
             encoder.return_value.predict.return_value = [0.2, 0.8]
             reranker = DocumentReranker()
             result = reranker.rerank_documents(
                 "query",
-                [{"id": "first", "content": "a" * 1100},
+                [{"id": "first", "title": "Title", "content": "a" * 2100 + "QUYỀN_LỢI"},
                  {"id": "second", "content": "short"}],
             )
         encoder.assert_called_once_with("BAAI/bge-reranker-v2-m3")
         pairs = encoder.return_value.predict.call_args.args[0]
-        self.assertEqual(pairs[0][1], "a" * 1000 + "...")
+        self.assertEqual(pairs[0][1], "Title. " + "a" * 2100 + "QUYỀN_LỢI")
         self.assertEqual([doc["id"] for doc in result], ["second", "first"])
 
     def test_bge_load_failure_does_not_switch_to_another_model(self):
-        with patch("main.reranker.CrossEncoder", side_effect=RuntimeError("unavailable")) as encoder:
+        with patch.object(Config, "RERANK_PROVIDER", "local"), patch("main.reranker.CrossEncoder", side_effect=RuntimeError("unavailable")) as encoder:
             reranker = DocumentReranker()
         encoder.assert_called_once_with(Config.RERANKER_MODEL)
         self.assertIsNone(reranker.model)

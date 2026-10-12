@@ -1,4 +1,5 @@
 import os
+import re
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -6,10 +7,17 @@ load_dotenv()
 
 
 class Config:
-    # Local inference through LangChain/Ollama; no provider API key.
+    # Select inference independently of the embedding provider.
+    INFERENCE_PROVIDER = os.getenv("INFERENCE_PROVIDER", "ollama")
+    if INFERENCE_PROVIDER not in ("ollama", "deepseek"):
+        raise ValueError("INFERENCE_PROVIDER must be ollama or deepseek")
+    DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL") or "https://api.deepseek.com"
+    DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL") or "deepseek-flash"
+    DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
     OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-    MODEL_GEN = os.getenv("OLLAMA_MODEL", "qwen3.5:9b")
-    MODEL_REFINE = MODEL_GEN  # Legacy helpers use the same local model.
+    MODEL_GEN = (DEEPSEEK_MODEL if INFERENCE_PROVIDER == "deepseek"
+                 else os.getenv("OLLAMA_MODEL", "qwen3.5:9b"))
+    MODEL_REFINE = MODEL_GEN  # Legal detection uses the selected inference provider.
     GENERATION_MAX_TOKENS = 2048
     OLLAMA_CONTEXT = 8192
 
@@ -20,15 +28,22 @@ class Config:
     
     # Embedding configuration
     # EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-    EMBEDDING_MODEL = "bkai-foundation-models/vietnamese-bi-encoder"
+    EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "local")
+    if EMBEDDING_PROVIDER not in ("local", "hosted"):
+        raise ValueError("EMBEDDING_PROVIDER must be local or hosted")
+    EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL") or ("BAAI/bge-m3" if EMBEDDING_PROVIDER == "hosted" else "bkai-foundation-models/vietnamese-bi-encoder")
+    EMBEDDING_BASE_URL = os.getenv("EMBEDDING_BASE_URL") or "https://api.dek.io.vn/v1/"
+    EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY", "")
+    EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS") or ("1024" if EMBEDDING_PROVIDER == "hosted" else "768"))
     
     COLLECTION_NAME = "final_vietnamese_legal_corpus" if EMBEDDING_MODEL == "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2" else "bkai_biencoder_vietnamese_legal_corpus"
+    if EMBEDDING_PROVIDER == "hosted":
+        COLLECTION_NAME = "hosted_" + re.sub(r"[^a-z0-9]+", "_", EMBEDDING_MODEL.lower()).strip("_") + "_" + str(EMBEDDING_DIMENSIONS)
 
     # Text Processing Configuration
     CHUNK_SIZE = 512
     CHUNK_OVERLAP = 50
-    MAX_ARTICLE_CHARACTERS = 1000
-    INDEX_BATCH_SIZE = 128
+    INDEX_BATCH_SIZE = 16 if EMBEDDING_PROVIDER == "hosted" else 128
     EMBEDDING_BATCH_SIZE = 16
 
     # Data Paths
@@ -44,6 +59,11 @@ class Config:
     SIMILARITY_THRESHOLD = 0.25
 
     # Reranker Configuration
+    RERANK_PROVIDER = os.getenv("RERANK_PROVIDER", "local")
+    if RERANK_PROVIDER not in ("local", "hosted"):
+        raise ValueError("RERANK_PROVIDER must be local or hosted")
+    RERANK_URL = os.getenv("RERANK_URL") or "https://api.dek.io.vn/rerank"
+    RERANK_API_KEY = os.getenv("RERANK_API_KEY") or EMBEDDING_API_KEY
     ENABLE_RERANKING = True
     RERANKER_MODEL = "BAAI/bge-reranker-v2-m3"
     RERANKER_TOP_K = TOP_K_RETRIEVAL

@@ -5,8 +5,20 @@ services:
       target: api
     restart: unless-stopped
     environment:
+      INFERENCE_PROVIDER: ${INFERENCE_PROVIDER:-ollama}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       OLLAMA_BASE_URL: ${DOCKER_OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.5:9b}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-local}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-https://api.dek.io.vn/v1/}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-}
+      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      RERANK_PROVIDER: ${RERANK_PROVIDER:-local}
+      RERANK_URL: ${RERANK_URL:-https://api.dek.io.vn/rerank}
+      RERANK_API_KEY: ${RERANK_API_KEY:-}
       QDRANT_URL: http://qdrant:6333
       QDRANT_API_KEY: ""
       QDRANT_PATH: ""

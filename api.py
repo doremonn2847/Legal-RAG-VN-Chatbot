@@ -60,15 +60,9 @@ def close_pipeline(rag):
 
 def check_dependencies(rag):
     """Check services without generating an answer or calculating index statistics."""
-    import requests
-    from config import Config
+    from utils.inference import check_inference_ready
 
-    response = requests.get(Config.OLLAMA_BASE_URL.rstrip("/") + "/api/tags", timeout=5)
-    response.raise_for_status()
-    names = {model["name"] for model in response.json()["models"]}
-    model_name = Config.MODEL_GEN if ":" in Config.MODEL_GEN else Config.MODEL_GEN + ":latest"
-    if model_name not in names:
-        raise RuntimeError(f"Download the configured Ollama model: {Config.MODEL_GEN}")
+    check_inference_ready()
     store = rag.vector_store
     info = store.client.get_collection(store.collection_name)
     if not info.points_count or info.points_count != len(rag.bm25_retriever.documents):
@@ -177,7 +171,7 @@ def create_app(rag_factory: Callable = load_pipeline, readiness_probe: Callable 
                         id=str(doc.get("id", "")), title=str(doc.get("title", "")),
                         law_id=str(metadata.get("law_id", "")),
                         article_id=str(metadata.get("article_id", "")),
-                        excerpt=doc.get("content", "")[:1000], score=float(doc.get("score", 0)),
+                        excerpt=doc.get("content", "")[:2000], score=float(doc.get("score", 0)),
                     ))
                 return AskResponse(
                     answer=result["answer"], question=request.question, sources=sources,

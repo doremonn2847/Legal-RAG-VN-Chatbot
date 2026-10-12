@@ -1,7 +1,7 @@
 from typing import List, Dict, Any, Optional
 import re
 import json
-from langchain_ollama import ChatOllama
+from utils.inference import create_chat_model
 from langchain_core.prompts import PromptTemplate
 from config import Config
 from utils.telemetry import trace_stage, llm_trace_config
@@ -15,13 +15,7 @@ class VietnameseLegalQuestionRefiner:
         # Initialize LLM for question refinement
         self.llm = None
         if Config.ENABLE_QUESTION_REFINEMENT or Config.USE_LLM_FOR_LEGAL_DETECTION:
-            self.llm = ChatOllama(
-                model=Config.MODEL_REFINE,
-                base_url=Config.OLLAMA_BASE_URL,
-                reasoning=False, num_ctx=Config.OLLAMA_CONTEXT,
-                num_predict=Config.GENERATION_MAX_TOKENS,
-                temperature=0.1
-            )
+            self.llm = create_chat_model()
         
         # Vietnamese legal terminology mappings
         self.legal_abbreviations = {

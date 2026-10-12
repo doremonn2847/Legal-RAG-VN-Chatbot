@@ -20,6 +20,12 @@ class DocumentReranker:
     
     def _initialize_model(self):
         """Initialize the cross-encoder model"""
+        if Config.RERANK_PROVIDER == "hosted":
+            from utils.hosted_reranker import HostedReranker
+            self.model = HostedReranker(Config.RERANK_URL, Config.RERANK_API_KEY)
+            self.model_name = "provider-managed"
+            print("Hosted reranker configured")
+            return
         try:
             print(f"Loading reranker model: {self.model_name}")
             self.model = CrossEncoder(self.model_name)
@@ -59,11 +65,6 @@ class DocumentReranker:
                 
                 # Combine title and content for better matching
                 doc_text = f"{title}. {content}" if title else content
-                
-                # Truncate very long documents to avoid model limits
-                max_length = Config.MAX_ARTICLE_CHARACTERS
-                if len(doc_text) > max_length:
-                    doc_text = doc_text[:max_length] + "..."
                 
                 pairs.append([query, doc_text])
                 valid_docs.append(doc)
@@ -192,5 +193,6 @@ class DocumentReranker:
         return {
             'model_name': self.model_name,
             'model_loaded': self.model is not None,
-            'model_type': 'cross-encoder'
+            'model_type': 'cross-encoder',
+            'provider': Config.RERANK_PROVIDER
         }

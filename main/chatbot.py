@@ -1,5 +1,5 @@
 from typing import List, Dict, Any, Optional
-from langchain_ollama import ChatOllama
+from utils.inference import create_chat_model
 from langchain_core.messages import HumanMessage
 
 from main.vector_store import QdrantVectorStore
@@ -28,12 +28,8 @@ class VietnameseLegalRAG:
     def _initialize_components(self):
         """Initialize RAG components"""
         try:
-            self.llm = ChatOllama(
-                model=Config.MODEL_GEN, base_url=Config.OLLAMA_BASE_URL,
-                temperature=0.1, reasoning=False,
-                num_ctx=Config.OLLAMA_CONTEXT, num_predict=Config.GENERATION_MAX_TOKENS
-            )
-            print("Qwen/Ollama LLM configured")
+            self.llm = create_chat_model()
+            print(f"{Config.INFERENCE_PROVIDER} LLM configured: {Config.MODEL_GEN}")
 
             # Initialize vector store
             self.vector_store = QdrantVectorStore()
@@ -72,10 +68,7 @@ class VietnameseLegalRAG:
                             
                             if force_rebuild:
                                 print("Force rebuild requested - recreating vector store...")
-                                if Config.EMBEDDING_MODEL == "bkai-foundation-models/vietnamese-bi-encoder":
-                                    self.vector_store.create_collection(force_recreate=True, vector_size=768)
-                                else:
-                                    self.vector_store.create_collection(force_recreate=True)
+                                self.vector_store.create_collection(force_recreate=True)
                                 self.vector_store.add_documents(documents)
                             elif not has_documents:
                                 print("Collection is incomplete - adding remaining documents...")
@@ -86,29 +79,20 @@ class VietnameseLegalRAG:
                             print(f"Could not get collection info: {info_e}")
                             if force_rebuild:
                                 print("Force rebuild requested - recreating vector store...")
-                                if Config.EMBEDDING_MODEL == "bkai-foundation-models/vietnamese-bi-encoder":
-                                    self.vector_store.create_collection(force_recreate=True, vector_size=768)
-                                else:
-                                    self.vector_store.create_collection(force_recreate=True)
+                                self.vector_store.create_collection(force_recreate=True)
                                 self.vector_store.add_documents(documents)
                             else:
                                 print("Assuming collection has documents - skipping setup")
                     else:
                         # Collection doesn't exist, create it
                         print("Collection does not exist - creating new collection...")
-                        if Config.EMBEDDING_MODEL == "bkai-foundation-models/vietnamese-bi-encoder":
-                            self.vector_store.create_collection(force_recreate=True, vector_size=768)
-                        else:
-                            self.vector_store.create_collection(force_recreate=True)
+                        self.vector_store.create_collection(force_recreate=True)
                         self.vector_store.add_documents(documents)
                         
                 except Exception as e:
                     print(f"Error during vector store setup: {e}")
                     print("Attempting to create collection...")
-                    if Config.EMBEDDING_MODEL == "bkai-foundation-models/vietnamese-bi-encoder":
-                        self.vector_store.create_collection(force_recreate=True, vector_size=768)
-                    else:
-                        self.vector_store.create_collection(force_recreate=True)
+                    self.vector_store.create_collection(force_recreate=True)
                     self.vector_store.add_documents(documents)
             
             # Setup BM25 index
@@ -285,10 +269,6 @@ class VietnameseLegalRAG:
             metadata = doc.get('metadata', {})
             law_id = metadata.get('law_id', '')
             article_id = metadata.get('article_id', '')
-            
-            # Limit content length
-            if len(content) > Config.MAX_ARTICLE_CHARACTERS:
-                content = content[:Config.MAX_ARTICLE_CHARACTERS] + "..."
             
             # Format law and article information
             law_info = f"Luật: {law_id}" if law_id else ""
@@ -560,7 +540,8 @@ Nội dung: {content}
             'bm25_available': self.bm25_retriever is not None,
             'reranker_available': self.reranker is not None and self.reranker.model is not None,
             'reranking_enabled': Config.ENABLE_RERANKING,
-            'ollama_configured': bool(Config.OLLAMA_BASE_URL),
+            'ollama_configured': Config.INFERENCE_PROVIDER == 'ollama' and bool(Config.OLLAMA_BASE_URL),
+            'inference_provider': Config.INFERENCE_PROVIDER,
             'inference_model': Config.MODEL_GEN,
             'qdrant_configured': bool(Config.QDRANT_URL and Config.QDRANT_API_KEY)
         }

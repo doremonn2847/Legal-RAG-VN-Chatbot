@@ -1,4 +1,5 @@
 import os
+import logging
 import time
 import uuid
 from html import escape
@@ -56,6 +57,7 @@ class VietnameseLegalChatbot:
                 answer = "⚠️ Dịch vụ trả lời đang gặp lỗi. Vui lòng thử lại sau."
             docs, status = "", "❌ Lỗi dịch vụ"
         except (ValueError, KeyError, TypeError):
+            logging.getLogger(__name__).exception("Invalid API response")
             answer = "⚠️ Dịch vụ trả về dữ liệu không hợp lệ."
             docs, status = "", "❌ Lỗi phản hồi"
         history.extend([{"role": "user", "content": question}, {"role": "assistant", "content": answer}])
@@ -222,11 +224,13 @@ def create_chatbot_interface():
                 )
         
         status_display = gr.Markdown("💬 Nhập câu hỏi để bắt đầu")
-        session_id = gr.State(value=lambda: uuid.uuid4().hex)
+        session_id = gr.State(value=None)
 
         def handle_message(message, history, conversation_id):
+            if not isinstance(conversation_id, str):
+                conversation_id = uuid.uuid4().hex
             new_history, docs, status = chatbot.process_message(message, history, conversation_id)
-            return new_history, "", docs, status
+            return new_history, "", docs, status, conversation_id
 
         def handle_clear_chat():
             return [], "", "💬 Nhập câu hỏi để bắt đầu", uuid.uuid4().hex
@@ -242,13 +246,13 @@ def create_chatbot_interface():
         send_button.click(
             handle_message,
             inputs=[message_input, chatbot_component, session_id],
-            outputs=[chatbot_component, message_input, docs_display, status_display]
+            outputs=[chatbot_component, message_input, docs_display, status_display, session_id]
         )
         
         message_input.submit(
             handle_message,
             inputs=[message_input, chatbot_component, session_id],
-            outputs=[chatbot_component, message_input, docs_display, status_display]
+            outputs=[chatbot_component, message_input, docs_display, status_display, session_id]
         )
         
         clear_chat_btn.click(
@@ -259,9 +263,15 @@ def create_chatbot_interface():
     return interface
 
 def main():
+    share = os.getenv("GRADIO_SHARE", "false").lower() == "true"
+    username = os.getenv("DEMO_USERNAME", "").strip()
+    password = os.getenv("DEMO_PASSWORD", "")
+    if (share or username or password) and (not username or len(password) < 12):
+        raise ValueError("Public demos require DEMO_USERNAME and DEMO_PASSWORD (at least 12 characters).")
     interface = create_chatbot_interface()
     interface.launch(server_name=os.getenv("GRADIO_SERVER_NAME", "127.0.0.1"),
-                     server_port=7860, share=False, show_api=False)
+                     server_port=7860, share=share, show_api=False,
+                     auth=(username, password) if username and password else None)
 
 
 if __name__ == "__main__":

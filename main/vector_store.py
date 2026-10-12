@@ -31,13 +31,14 @@ class QdrantVectorStore:
             if Config.QDRANT_URL:
                 # Cloud QDrant
                 self.client = QdrantClient(
-                    url=Config.QDRANT_URL, api_key=Config.QDRANT_API_KEY or None
+                    url=Config.QDRANT_URL, api_key=Config.QDRANT_API_KEY or None,
+                    timeout=60,
                 )
             elif Config.QDRANT_PATH:
                 self.client = QdrantClient(path=Config.QDRANT_PATH)
             else:
                 # Local QDrant (fallback)
-                self.client = QdrantClient(host="localhost", port=6333)
+                self.client = QdrantClient(host="localhost", port=6333, timeout=60)
 
             print("QDrant client initialized successfully")
         except Exception as e:
@@ -46,6 +47,10 @@ class QdrantVectorStore:
 
     def _initialize_embedding_model(self):
         """Initialize embedding model"""
+        if Config.EMBEDDING_PROVIDER == "hosted":
+            from utils.hosted_embeddings import HostedEmbeddings
+            self.embedding_model = HostedEmbeddings(Config.EMBEDDING_BASE_URL, Config.EMBEDDING_MODEL, Config.EMBEDDING_DIMENSIONS, Config.EMBEDDING_API_KEY)
+            return
         try:
             # Clear any potentially corrupted cache
             import tempfile
@@ -80,8 +85,12 @@ class QdrantVectorStore:
             print(f"Error loading embedding model: {e}")
             raise
 
-    def create_collection(self, vector_size: int = 384, force_recreate: bool = False):
+    def create_collection(self, vector_size: int = None, force_recreate: bool = False):
         """Create collection in QDrant"""
+        if vector_size is None:
+            vector_size = self.embedding_model.get_sentence_embedding_dimension()
+        if Config.EMBEDDING_PROVIDER == "hosted" and vector_size != Config.EMBEDDING_DIMENSIONS:
+            raise ValueError("Collection dimension does not match hosted embedding configuration")
         try:
             # Check if collection exists
             collections = self.client.get_collections().collections
@@ -104,6 +113,8 @@ class QdrantVectorStore:
                     )
                     print(f"Successfully created collection: {self.collection_name}")
                 else:
+                    if self.client.get_collection(self.collection_name).config.params.vectors.size != vector_size:
+                        raise ValueError("Existing collection has incompatible embedding dimensions")
                     print(
                         f"Collection {self.collection_name} already exists - skipping creation"
                     )

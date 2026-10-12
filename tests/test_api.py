@@ -12,7 +12,7 @@ class ApiTests(unittest.TestCase):
         self.rag = MagicMock()
         self.rag.answer_question.return_value = {
             "answer": "Answer", "retrieved_documents": [
-                {"id": "law_1", "content": "x" * 1100, "score": 0.8,
+                {"id": "law_1", "content": "x" * 2100, "score": 0.8,
                  "metadata": {"law_id": "law", "article_id": "1"}}],
             "fallback_used": False, "rejected_non_legal": False,
         }
@@ -27,7 +27,7 @@ class ApiTests(unittest.TestCase):
             self.assertEqual(client.get("/ready").status_code, 200)
             response = client.post("/ask", json={"question": "  Question?  "})
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(len(response.json()["sources"][0]["excerpt"]), 1000)
+            self.assertEqual(len(response.json()["sources"][0]["excerpt"]), 2000)
             self.assertEqual(response.json()["sources"][0]["article_id"], "1")
             self.rag.answer_question.assert_called_once_with(
                 "Question?", use_fallback=False, refine_question=False, top_k=5)
@@ -136,7 +136,7 @@ class StrictPipelineTests(unittest.TestCase):
         rag = SimpleNamespace(vector_store=MagicMock(),
                               bm25_retriever=SimpleNamespace(documents=[{}, {}]))
         rag.vector_store.client.get_collection.return_value.points_count = 2
-        with patch("requests.get") as get:
+        with patch.multiple(Config, INFERENCE_PROVIDER="ollama", MODEL_GEN="qwen3.5:9b"), patch("requests.get") as get:
             get.return_value.json.return_value = {"models": [{"name": Config.MODEL_GEN}]}
             check_dependencies(rag)
             rag.vector_store.client.get_collection.return_value.points_count = 1

@@ -8,6 +8,8 @@ A Retrieval-Augmented Generation (RAG) system designed to answer legal questions
 
 ## **Features**
 
+This development branch includes an optional [hosted BGE-M3 embedding experiment](docs/hosted-retrieval.md), with a separate 1,024-dimensional Qdrant collection and resumable indexing script. It also supports `deepseek-flash` through `langchain-deepseek` for generation and legal-domain detection; select it with `INFERENCE_PROVIDER=deepseek` and the `DEEPSEEK_*` settings in `.env`. Hosted reranking is available through `https://api.dek.io.vn/rerank`; select it with `RERANK_PROVIDER=hosted` to avoid loading a local cross-encoder. The results below describe the original pipeline.
+
 - **Hybrid RAG Architecture** - Combines Vietnamese dense embeddings, BM25 keyword search, and BGE cross-encoder reranking.
 - **Original-Query Retrieval** - Uses the user's question directly; query refinement is disabled to avoid introducing unsupported article references.
 - **Top-5 Evidence** - Retrieves 25 sparse and 25 dense candidates, deduplicates them, and selects five articles after reranking and score fusion.
@@ -137,7 +139,7 @@ flowchart LR
 
 - **BGE Cross-Encoder** - Uses `BAAI/bge-reranker-v2-m3` to score query/article pairs.
 - **Score Fusion** - Combines normalized retrieval and reranker scores with reranker weight 0.8, then selects **top-5** for answers.
-- **Article Excerpts** - Limits title-plus-content reranking input and answer context to 1,000 characters per article, with an ellipsis when truncated. Full articles remain in the indexes.
+- **Article Excerpts** - Passes complete articles to reranking and answer generation. API/UI source excerpts are limited to 2,000 characters; model/provider token limits still apply.
 
 ### Generation Layer
 

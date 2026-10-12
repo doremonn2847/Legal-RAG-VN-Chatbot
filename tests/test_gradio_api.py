@@ -5,10 +5,35 @@ import requests
 from fastapi.testclient import TestClient
 
 from api import create_app
-from app import VietnameseLegalChatbot, create_chatbot_interface
+from app import VietnameseLegalChatbot, create_chatbot_interface, main
 
 
 class GradioApiTests(unittest.TestCase):
+    def test_public_demo_requires_credentials_before_launch(self):
+        for password in ("", "short"):
+            with patch.dict("os.environ", {"GRADIO_SHARE": "true", "DEMO_USERNAME": "demo", "DEMO_PASSWORD": password}), patch("app.create_chatbot_interface") as create:
+                with self.assertRaises(ValueError):
+                    main()
+                create.assert_not_called()
+
+    def test_public_demo_enables_auth(self):
+        with patch.dict("os.environ", {"GRADIO_SHARE": "true", "DEMO_USERNAME": "demo", "DEMO_PASSWORD": "test-password-123"}), patch("app.create_chatbot_interface") as create:
+            main()
+        self.assertTrue(create.return_value.launch.call_args.kwargs["share"])
+        self.assertEqual(create.return_value.launch.call_args.kwargs["auth"], ("demo", "test-password-123"))
+
+    def test_local_demo_does_not_share(self):
+        with patch.dict("os.environ", {"GRADIO_SHARE": "false", "DEMO_USERNAME": "", "DEMO_PASSWORD": ""}), patch("app.create_chatbot_interface") as create:
+            main()
+        self.assertFalse(create.return_value.launch.call_args.kwargs["share"])
+        self.assertIsNone(create.return_value.launch.call_args.kwargs["auth"])
+
+    def test_external_tunnel_keeps_auth_without_gradio_sharing(self):
+        with patch.dict("os.environ", {"GRADIO_SHARE": "false", "DEMO_USERNAME": "demo", "DEMO_PASSWORD": "test-password-123"}), patch("app.create_chatbot_interface") as create:
+            main()
+        self.assertFalse(create.return_value.launch.call_args.kwargs["share"])
+        self.assertEqual(create.return_value.launch.call_args.kwargs["auth"], ("demo", "test-password-123"))
+
     def setUp(self):
         self.chatbot = VietnameseLegalChatbot("http://api.test:8000/")
         self.result = {
@@ -114,6 +139,17 @@ class GradioApiTests(unittest.TestCase):
         chat = next(c for c in interface.config["components"] if c["type"] == "chatbot")
         self.assertEqual(chat["props"]["type"], "messages")
         post.assert_not_called()
+        interface.close()
+
+    def test_first_chat_call_initializes_and_reuses_session(self):
+        interface = create_chatbot_interface()
+        handler = next(f.fn for f in interface.fns.values() if getattr(f.fn, "__name__", "") == "handle_message")
+        with patch("app.requests.post", return_value=self.response()) as post:
+            result = handler("q", [], None)
+            conversation_id = result[-1]
+            self.assertEqual(len(conversation_id), 32)
+            self.assertEqual(post.call_args.kwargs["headers"]["X-Session-ID"], conversation_id)
+            self.assertEqual(handler("next", result[0], conversation_id)[-1], conversation_id)
         interface.close()
 
 

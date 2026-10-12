@@ -17,7 +17,10 @@ def check_environment():
     
     missing_vars = []
     
-    if not Config.OLLAMA_BASE_URL:
+    if Config.INFERENCE_PROVIDER == "deepseek":
+        if not Config.DEEPSEEK_API_KEY:
+            missing_vars.append("DEEPSEEK_API_KEY")
+    elif not Config.OLLAMA_BASE_URL:
         missing_vars.append("OLLAMA_BASE_URL")
 
     if bool(Config.QDRANT_URL) != bool(Config.QDRANT_API_KEY):
@@ -174,7 +177,7 @@ def display_system_status(rag_system):
     print(f"🤖 LLM Available: {'✅' if status['llm_available'] else '❌'}")
     print(f"🔍 Vector Store: {'✅' if status['vector_store_available'] else '❌'}")
     print(f"📊 BM25 Retriever: {'✅' if status['bm25_available'] else '❌'}")
-    print(f"🤖 Ollama configured: {'✅' if status['ollama_configured'] else '❌'}")
+    print(f"🤖 Inference provider: {status['inference_provider']} ({status['inference_model']})")
     print(f"☁️  QDrant Cloud: {'✅' if status['qdrant_configured'] else '❌'}")
     
     # Vector store info

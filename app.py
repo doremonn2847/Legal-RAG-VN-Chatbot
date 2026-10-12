@@ -74,10 +74,10 @@ class VietnameseLegalChatbot:
     def upload_document(self, filepath, token=None):
         if not filepath:
             return "⚠️ Chọn tệp PDF/DOCX trước.", token
-        path = Path(filepath)
-        if path.suffix.lower() not in ('.pdf', '.docx') or path.stat().st_size > 10*1024*1024:
-            return "⚠️ Chỉ nhận PDF/DOCX tối đa 10 MiB.", token
         try:
+            path = Path(filepath)
+            if path.suffix.lower() not in ('.pdf', '.docx') or path.stat().st_size > 10*1024*1024:
+                return "⚠️ Chỉ nhận PDF/DOCX tối đa 10 MiB.", token
             with path.open('rb') as handle:
                 response = requests.post(self.api_base_url + '/documents',
                     files={'file': (path.name, handle)},
@@ -85,9 +85,9 @@ class VietnameseLegalChatbot:
             response.raise_for_status()
             result = response.json()
             files = ', '.join(escape(f['filename']) for f in result['files'])
-            return f"✅ Đã lập chỉ mục: {files}. Tài liệu chỉ dùng trong phiên này (24 giờ).", result['token']
-        except (requests.RequestException, ValueError, KeyError):
-            return "⚠️ Không xử lý được tệp. Kiểm tra giới hạn (3 tệp, 50 trang PDF), thử tệp có văn bản hoặc thử lại khi dịch vụ rảnh.", token
+            return f"✅ **Xử lý xong — tài liệu sẵn sàng để hỏi.**\n\nĐã lập chỉ mục: {files}. Tài liệu chỉ dùng trong phiên này (24 giờ).", result['token']
+        except (requests.RequestException, OSError, ValueError, KeyError, TypeError):
+            return "⚠️ **Xử lý không thành công.** Kiểm tra giới hạn (3 tệp, 50 trang PDF), thử tệp có văn bản hoặc thử lại khi dịch vụ rảnh.", token
 
     def clear_documents(self, token):
         if not token:
@@ -258,9 +258,9 @@ def create_chatbot_interface():
             # Right sidebar - Reference documents (expanded)
             with gr.Column(scale=3, min_width=350):
                 gr.Markdown("### 📎 Thêm tài liệu pháp lý\nPDF/DOCX: tối đa 10 MiB/tệp, 50 trang PDF, 3 tệp/phiên. PDF cần có văn bản; chưa hỗ trợ OCR.\n\nKhi bấm xử lý, nội dung sẽ được gửi tới dịch vụ embedding, reranking và mô hình trả lời. Tài liệu riêng cho phiên này, tự hết hạn sau 24 giờ.")
+                upload_status = gr.Markdown("Chưa có tài liệu tải lên.", elem_classes="upload-status")
                 upload_file = gr.File(label="Chọn tài liệu", file_types=['.pdf', '.docx'], type='filepath')
                 upload_button = gr.Button("📥 Xử lý tài liệu", size='sm')
-                upload_status = gr.Markdown("Chưa có tài liệu tải lên.")
                 # Enhanced documents display
                 docs_display = gr.Markdown(
                     value="📄 **Tài liệu tham khảo sẽ hiển thị ở đây**",
@@ -285,8 +285,15 @@ def create_chatbot_interface():
                 raise gr.Error("Không xóa được tài liệu. Vui lòng thử lại; phiên vẫn được giữ.") from None
             return [], "", "💬 Nhập câu hỏi để bắt đầu", uuid.uuid4().hex, None, "Chưa có tài liệu tải lên.", None
 
-        upload_button.click(chatbot.upload_document, inputs=[upload_file, document_token],
-                            outputs=[upload_status, document_token])
+        def handle_upload(filepath, token):
+            if filepath:
+                yield ("⏳ **Đang xử lý tài liệu…**\n\nĐang đọc văn bản và lập chỉ mục. PDF đầu tiên có thể mất vài phút; chờ thông báo hoàn tất trước khi hỏi.",
+                       token, gr.update(value="⏳ Đang xử lý…", interactive=False))
+            status, next_token = chatbot.upload_document(filepath, token)
+            yield status, next_token, gr.update(value="📥 Xử lý tài liệu", interactive=True)
+
+        upload_button.click(handle_upload, inputs=[upload_file, document_token],
+                            outputs=[upload_status, document_token, upload_button], show_progress="hidden")
 
         # Wire up sample question buttons
         for btn, question in sample_buttons:

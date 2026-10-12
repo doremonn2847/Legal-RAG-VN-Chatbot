@@ -9,6 +9,28 @@ from app import VietnameseLegalChatbot, create_chatbot_interface, main
 
 
 class GradioApiTests(unittest.TestCase):
+    def test_upload_shows_busy_before_work_and_restores_button_when_done(self):
+        interface = create_chatbot_interface()
+        handler = next(f.fn for f in interface.fns.values() if getattr(f.fn, '__name__', '') == 'handle_upload')
+        with patch('app.VietnameseLegalChatbot.upload_document', return_value=('✅ Ready', 'new-token')) as upload:
+            updates = handler('legal.pdf', 'old-token')
+            busy = next(updates)
+            upload.assert_not_called()
+            self.assertIn('Đang xử lý', busy[0])
+            self.assertEqual(busy[1], 'old-token')
+            self.assertFalse(busy[2]['interactive'])
+            done = next(updates)
+            self.assertEqual(done[:2], ('✅ Ready', 'new-token'))
+            self.assertTrue(done[2]['interactive'])
+
+    def test_failed_upload_preserves_session_and_restores_button(self):
+        interface = create_chatbot_interface()
+        handler = next(f.fn for f in interface.fns.values() if getattr(f.fn, '__name__', '') == 'handle_upload')
+        with patch('app.VietnameseLegalChatbot.upload_document', return_value=('⚠️ Failed', 'old-token')):
+            updates = list(handler('bad.pdf', 'old-token'))
+        self.assertEqual(updates[-1][:2], ('⚠️ Failed', 'old-token'))
+        self.assertTrue(updates[-1][2]['interactive'])
+
     def test_uploaded_sources_show_filename_and_page_without_law_labels(self):
         page = VietnameseLegalChatbot()._format_retrieved_documents([{
             'source_type': 'upload', 'filename': '<law>.pdf', 'page': 3,

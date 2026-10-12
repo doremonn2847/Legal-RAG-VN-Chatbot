@@ -535,6 +535,13 @@ button[title*="Gửi"],
     100% { transform: translateY(-50%) rotate(360deg); }
 }
 
+.upload-status {
+    border: 1px solid var(--primary-blue);
+    border-radius: 8px;
+    padding: 12px;
+    min-height: 64px;
+}
+
 /* Documents display */
 .docs-display {
     background: var(--surface-color);

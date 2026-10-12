@@ -54,6 +54,9 @@ services:
       API_BASE_URL: http://api:8000
       GRADIO_SERVER_NAME: 0.0.0.0
       GRADIO_ANALYTICS_ENABLED: "false"
+      GRADIO_SHARE: ${GRADIO_SHARE:-false}
+      DEMO_USERNAME: ${DEMO_USERNAME:-}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
     ports:
       - "127.0.0.1:${UI_PORT:-7860}:7860"
     depends_on:

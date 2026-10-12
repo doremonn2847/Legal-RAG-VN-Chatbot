@@ -279,6 +279,26 @@ docker compose stop ui api
 
 See [Docker and Langfuse setup](docs/docker-langfuse.md) for host Ollama connectivity, storage, and troubleshooting.
 
+#### Public demo from your laptop
+
+Set these in your private `.env`, using a password of at least 12 characters:
+
+```dotenv
+GRADIO_SHARE=false
+DEMO_USERNAME=demo
+DEMO_PASSWORD=replace-with-a-long-random-password
+```
+
+With the API ready, run `docker compose up -d --build ui`. Credentials enable Gradio login even with its built-in sharing disabled. Download [Cloudflare's Windows tunnel client](https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe) as `results/cloudflared.exe`, then run from PowerShell:
+
+```powershell
+.\results\cloudflared.exe tunnel --url http://127.0.0.1:7860 --protocol http2 --edge-ip-version 4 --no-autoupdate
+```
+
+Share the printed `https://...trycloudflare.com` URL with your demo credentials. Only the password-protected UI is shared; the API and database remain local. Keep the tunnel, Docker, Ollama, and laptop running. The URL changes when the tunnel restarts, and Cloudflare Quick Tunnels are temporary demos without an availability guarantee. Browser chat uses streaming updates; Quick Tunnels do not officially support server-sent events, so use a named tunnel for reliable long-running sessions if streaming stalls. Press Ctrl+C in the tunnel terminal to stop public access. Stop the UI/API with `docker compose stop ui api` when finished.
+
+Gradio's built-in temporary link is also available with `GRADIO_SHARE=true`; it requires the same credentials and access to Gradio's tunnel service.
+
 #### Native FastAPI and Gradio
 
 With Qdrant and Ollama running, start FastAPI:
@@ -333,7 +353,7 @@ python -m unittest discover -s tests -v
 LANGFUSE_TRACING_ENABLED=false PYTHONIOENCODING=utf-8 python -m unittest discover -s tests -v
 ```
 
-The offline suite uses test doubles and does not require model downloads or live credentials. The current application suite contains **61 tests** covering retrieval, query routing, dataset/index handling, API/UI behavior, and telemetry. Tests specific to the removed benchmark tooling are no longer included. Live model quality and citation faithfulness require separate review.
+The offline suite uses test doubles and does not require model downloads or live credentials. The current application suite contains **66 tests** covering retrieval, query routing, dataset/index handling, API/UI behavior, and telemetry. Tests specific to the removed benchmark tooling are no longer included. Live model quality and citation faithfulness require separate review.
 
 ## **References**
 

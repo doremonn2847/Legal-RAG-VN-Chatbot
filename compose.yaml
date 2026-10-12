@@ -19,8 +19,8 @@ services:
       RERANK_PROVIDER: ${RERANK_PROVIDER:-local}
       RERANK_URL: ${RERANK_URL:-https://api.dek.io.vn/rerank}
       RERANK_API_KEY: ${RERANK_API_KEY:-}
-      QDRANT_URL: http://qdrant:6333
-      QDRANT_API_KEY: ""
+      QDRANT_URL: ${QDRANT_CLOUD_URL:-http://qdrant:6333}
+      QDRANT_API_KEY: ${QDRANT_CLOUD_API_KEY:-}
       QDRANT_PATH: ""
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
@@ -46,6 +46,7 @@ services:
         bind:
           create_host_path: false
       - model-cache:/home/app/.cache/huggingface
+      - document-cache:/home/app/.cache/docling
     depends_on:
       qdrant:
         condition: service_started
@@ -86,3 +87,4 @@ services:
 
 volumes:
   model-cache:
+  document-cache:

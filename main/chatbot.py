@@ -111,7 +111,7 @@ class VietnameseLegalRAG:
             raise
     
     @trace_stage("retrieve-context", as_type="retriever")
-    def retrieve_documents(self, query: str, use_hybrid: bool = True, use_reranking: bool = None, top_k: Optional[int] = None) -> List[Dict[str, Any]]:
+    def retrieve_documents(self, query: str, use_hybrid: bool = True, use_reranking: bool = None, top_k: Optional[int] = None, uploaded_documents=None) -> List[Dict[str, Any]]:
         """Retrieve relevant documents using hybrid approach with optional reranking"""
         retrieved_docs = []
         top_k = Config.TOP_K_RETRIEVAL if top_k is None else top_k
@@ -186,6 +186,9 @@ class VietnameseLegalRAG:
                 # BM25 only
                 retrieved_docs = self.bm25_retriever.get_relevant_documents(query, top_k=bm25_top_k)
             
+            if uploaded_documents is not None:
+                retrieved_docs.extend(uploaded_documents(query))
+
             # Improved similarity filtering logic
             if retrieved_docs:
                 # Apply reranking FIRST if enabled (before similarity filtering)
@@ -269,6 +272,12 @@ class VietnameseLegalRAG:
             metadata = doc.get('metadata', {})
             law_id = metadata.get('law_id', '')
             article_id = metadata.get('article_id', '')
+
+            if metadata.get('source') == 'upload':
+                page = metadata.get('page')
+                citation = f"{metadata.get('filename', title)}" + (f", trang {page}" if page else ", đoạn văn bản (DOCX)")
+                context_parts.append(f"Tài liệu {i} — do người dùng cung cấp: {citation}\nNội dung: {content}")
+                continue
             
             # Format law and article information
             law_info = f"Luật: {law_id}" if law_id else ""
@@ -349,7 +358,7 @@ Nội dung: {content}
         response_lower = response.lower()
         return any(indicator in response_lower for indicator in negative_indicators)
     
-    def answer_question(self, query: str, use_fallback: bool = True, refine_question: bool = False, top_k: Optional[int] = None) -> Dict[str, Any]:
+    def answer_question(self, query: str, use_fallback: bool = True, refine_question: bool = False, top_k: Optional[int] = None, uploaded_documents=None) -> Dict[str, Any]:
         """Answer a legal question with original-query retrieval and negative response handling"""
         print(f"Processing question: {query}")
         top_k = 5 if top_k is None else top_k
@@ -360,7 +369,7 @@ Nội dung: {content}
         legal_check = None
 
         # Step 0: Legal domain filtering (if enabled)
-        if Config.ENABLE_LEGAL_DOMAIN_FILTER:
+        if Config.ENABLE_LEGAL_DOMAIN_FILTER and uploaded_documents is None:
             print("🔍 Checking if question is legal-related...")
             legal_check = self.question_refiner.is_legal_question(
                 query, 
@@ -393,7 +402,8 @@ Nội dung: {content}
         original_query = query
         refinement_result = None
 
-        retrieved_docs = self.retrieve_documents(query, top_k=top_k)
+        retrieved_docs = self.retrieve_documents(query, top_k=top_k, **(
+            {'uploaded_documents': uploaded_documents} if uploaded_documents is not None else {}))
         
         # Check if we have relevant documents
         if not retrieved_docs and Config.ENABLE_GOOGLE_SEARCH and use_fallback:

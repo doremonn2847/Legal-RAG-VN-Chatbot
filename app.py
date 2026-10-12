@@ -4,6 +4,7 @@ import time
 import uuid
 from html import escape
 from urllib.parse import urlsplit
+from pathlib import Path
 
 import gradio as gr
 import requests
@@ -18,7 +19,7 @@ class VietnameseLegalChatbot:
     def __init__(self, api_base_url=None):
         self.api_base_url = (api_base_url or os.getenv("API_BASE_URL", "http://127.0.0.1:8000")).rstrip("/")
 
-    def process_message(self, message, history, session_id=None):
+    def process_message(self, message, history, session_id=None, document_token=None):
         history = list(history or [])
         question = message.strip()
         if not question:
@@ -26,12 +27,17 @@ class VietnameseLegalChatbot:
         if len(question) > 2000:
             return history, "", "⚠️ Câu hỏi tối đa 2000 ký tự"
         start = time.monotonic()
+        headers = {}
+        if session_id:
+            headers['X-Session-ID'] = session_id
+        if document_token:
+            headers['X-Document-Token'] = document_token
         try:
             response = requests.post(
                 self.api_base_url + "/ask",
                 json={"question": question, "use_web_fallback": False},
                 timeout=(5, 600),
-                **({"headers": {"X-Session-ID": session_id}} if session_id else {}),
+                **({"headers": headers} if headers else {}),
             )
             response.raise_for_status()
             result = response.json()
@@ -53,6 +59,8 @@ class VietnameseLegalChatbot:
                 answer = "⚠️ Hệ thống đang xử lý câu hỏi khác. Vui lòng thử lại sau."
             elif code == 422:
                 answer = "⚠️ Câu hỏi không hợp lệ. Vui lòng nhập từ 1 đến 2000 ký tự."
+            elif code == 401:
+                answer = "⚠️ Phiên tài liệu đã hết hạn. Vui lòng xóa tài liệu cũ và tải lên lại."
             else:
                 answer = "⚠️ Dịch vụ trả lời đang gặp lỗi. Vui lòng thử lại sau."
             docs, status = "", "❌ Lỗi dịch vụ"
@@ -62,6 +70,32 @@ class VietnameseLegalChatbot:
             docs, status = "", "❌ Lỗi phản hồi"
         history.extend([{"role": "user", "content": question}, {"role": "assistant", "content": answer}])
         return history, docs, status
+
+    def upload_document(self, filepath, token=None):
+        if not filepath:
+            return "⚠️ Chọn tệp PDF/DOCX trước.", token
+        path = Path(filepath)
+        if path.suffix.lower() not in ('.pdf', '.docx') or path.stat().st_size > 10*1024*1024:
+            return "⚠️ Chỉ nhận PDF/DOCX tối đa 10 MiB.", token
+        try:
+            with path.open('rb') as handle:
+                response = requests.post(self.api_base_url + '/documents',
+                    files={'file': (path.name, handle)},
+                    headers={'X-Document-Token': token} if token else {}, timeout=(5, 210))
+            response.raise_for_status()
+            result = response.json()
+            files = ', '.join(escape(f['filename']) for f in result['files'])
+            return f"✅ Đã lập chỉ mục: {files}. Tài liệu chỉ dùng trong phiên này (24 giờ).", result['token']
+        except (requests.RequestException, ValueError, KeyError):
+            return "⚠️ Không xử lý được tệp. Kiểm tra giới hạn (3 tệp, 50 trang PDF), thử tệp có văn bản hoặc thử lại khi dịch vụ rảnh.", token
+
+    def clear_documents(self, token):
+        if not token:
+            return
+        response = requests.delete(self.api_base_url + '/documents',
+            headers={'X-Document-Token': token}, timeout=(5, 30))
+        if response.status_code != 401:
+            response.raise_for_status()
 
     def _format_retrieved_documents(self, sources, web_sources=None):
         # Escape corpus text before putting it into Markdown/HTML.
@@ -74,7 +108,13 @@ class VietnameseLegalChatbot:
             title = escape(str(source.get("title", "")))
             identifier = escape(str(source.get("id", "")))
             excerpt = escape(str(source.get("excerpt", "")))
-            blocks.append(f"<h3>{i}. {title}</h3><p>Luật: {law} · Điều: {article}</p>"
+            if source.get('source_type') == 'upload':
+                filename = escape(str(source.get('filename', title)))
+                page = source.get('page')
+                origin = f"Tài liệu tải lên: {filename}" + (f" · Trang {escape(str(page))}" if page else " · Đoạn văn bản DOCX")
+            else:
+                origin = f"Luật: {law} · Điều: {article}"
+            blocks.append(f"<h3>{i}. {title}</h3><p>{origin}</p>"
                           f"<p>ID: {identifier}</p><p>{excerpt}</p>")
         for source in web_sources or []:
             url = str(source.get("url", ""))
@@ -157,7 +197,8 @@ def create_chatbot_interface():
         css=css, 
         title="Trợ lý Pháp lý Việt Nam", 
         theme=gr.themes.Default(),
-        analytics_enabled=False
+        analytics_enabled=False,
+        delete_cache=(3600, 86400)
     ) as interface:
         
         # Enhanced header with simple styling
@@ -216,6 +257,10 @@ def create_chatbot_interface():
             
             # Right sidebar - Reference documents (expanded)
             with gr.Column(scale=3, min_width=350):
+                gr.Markdown("### 📎 Thêm tài liệu pháp lý\nPDF/DOCX: tối đa 10 MiB/tệp, 50 trang PDF, 3 tệp/phiên. PDF cần có văn bản; chưa hỗ trợ OCR.\n\nKhi bấm xử lý, nội dung sẽ được gửi tới dịch vụ embedding, reranking và mô hình trả lời. Tài liệu riêng cho phiên này, tự hết hạn sau 24 giờ.")
+                upload_file = gr.File(label="Chọn tài liệu", file_types=['.pdf', '.docx'], type='filepath')
+                upload_button = gr.Button("📥 Xử lý tài liệu", size='sm')
+                upload_status = gr.Markdown("Chưa có tài liệu tải lên.")
                 # Enhanced documents display
                 docs_display = gr.Markdown(
                     value="📄 **Tài liệu tham khảo sẽ hiển thị ở đây**",
@@ -225,15 +270,23 @@ def create_chatbot_interface():
         
         status_display = gr.Markdown("💬 Nhập câu hỏi để bắt đầu")
         session_id = gr.State(value=None)
+        document_token = gr.State(value=None, time_to_live=86400)
 
-        def handle_message(message, history, conversation_id):
+        def handle_message(message, history, conversation_id, token=None):
             if not isinstance(conversation_id, str):
                 conversation_id = uuid.uuid4().hex
-            new_history, docs, status = chatbot.process_message(message, history, conversation_id)
+            new_history, docs, status = chatbot.process_message(message, history, conversation_id, token)
             return new_history, "", docs, status, conversation_id
 
-        def handle_clear_chat():
-            return [], "", "💬 Nhập câu hỏi để bắt đầu", uuid.uuid4().hex
+        def handle_clear_chat(token):
+            try:
+                chatbot.clear_documents(token)
+            except requests.RequestException:
+                raise gr.Error("Không xóa được tài liệu. Vui lòng thử lại; phiên vẫn được giữ.") from None
+            return [], "", "💬 Nhập câu hỏi để bắt đầu", uuid.uuid4().hex, None, "Chưa có tài liệu tải lên.", None
+
+        upload_button.click(chatbot.upload_document, inputs=[upload_file, document_token],
+                            outputs=[upload_status, document_token])
 
         # Wire up sample question buttons
         for btn, question in sample_buttons:
@@ -245,19 +298,20 @@ def create_chatbot_interface():
         # Wire up main events
         send_button.click(
             handle_message,
-            inputs=[message_input, chatbot_component, session_id],
+            inputs=[message_input, chatbot_component, session_id, document_token],
             outputs=[chatbot_component, message_input, docs_display, status_display, session_id]
         )
         
         message_input.submit(
             handle_message,
-            inputs=[message_input, chatbot_component, session_id],
+            inputs=[message_input, chatbot_component, session_id, document_token],
             outputs=[chatbot_component, message_input, docs_display, status_display, session_id]
         )
         
         clear_chat_btn.click(
             handle_clear_chat,
-            outputs=[chatbot_component, docs_display, status_display, session_id]
+            inputs=[document_token],
+            outputs=[chatbot_component, docs_display, status_display, session_id, document_token, upload_status, upload_file]
         )
     
     return interface
@@ -271,7 +325,8 @@ def main():
     interface = create_chatbot_interface()
     interface.launch(server_name=os.getenv("GRADIO_SERVER_NAME", "127.0.0.1"),
                      server_port=7860, share=share, show_api=False,
-                     auth=(username, password) if username and password else None)
+                     auth=(username, password) if username and password else None,
+                     max_file_size="10mb")
 
 
 if __name__ == "__main__":

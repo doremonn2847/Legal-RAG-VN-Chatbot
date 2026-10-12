@@ -17,12 +17,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 gcc g+
     && rm -rf /var/lib/apt/lists/*
 # CPU embedding/reranking; Ollama inference runs on the host.
 RUN --mount=type=cache,target=/root/.cache/pip pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+RUN --mount=type=cache,target=/root/.cache/pip pip install torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cpu
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
+RUN apt-get update && apt-get install -y --no-install-recommends libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
 COPY api.py config.py ./
 COPY main ./main
 COPY utils ./utils
-RUN mkdir -p index data/utils /home/app/.cache/huggingface \
+RUN mkdir -p index data/utils /home/app/.cache/huggingface /home/app/.cache/docling \
     && chown -R app:app /app /home/app/.cache
 ENV HF_HOME=/home/app/.cache/huggingface
 USER app

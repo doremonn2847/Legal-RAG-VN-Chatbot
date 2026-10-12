@@ -8,7 +8,9 @@ A Retrieval-Augmented Generation (RAG) system designed to answer legal questions
 
 ## **Features**
 
-This development branch includes an optional [hosted BGE-M3 embedding experiment](docs/hosted-retrieval.md), with a separate 1,024-dimensional Qdrant collection and resumable indexing script. It also supports `deepseek-flash` through `langchain-deepseek` for generation and legal-domain detection; select it with `INFERENCE_PROVIDER=deepseek` and the `DEEPSEEK_*` settings in `.env`. Hosted reranking is available through `https://api.dek.io.vn/rerank`; select it with `RERANK_PROVIDER=hosted` to avoid loading a local cross-encoder. The results below describe the original pipeline.
+- **Private Document Uploads** - Adds session-private PDF/DOCX legal documents through Docling, with filename/page citations, hosted indexing, and automatic expiry. See [upload limits and setup](docs/document-uploads.md).
+
+The application supports [hosted BGE-M3 embeddings](docs/hosted-retrieval.md), with a separate 1,024-dimensional Qdrant collection and resumable indexing script. It also supports `deepseek-flash` through `langchain-deepseek` for generation and legal-domain detection; select it with `INFERENCE_PROVIDER=deepseek` and the `DEEPSEEK_*` settings in `.env`. Hosted reranking is available through `https://api.dek.io.vn/rerank`; select it with `RERANK_PROVIDER=hosted` to avoid loading a local cross-encoder. The results below describe the original pipeline.
 
 - **Hybrid RAG Architecture** - Combines Vietnamese dense embeddings, BM25 keyword search, and BGE cross-encoder reranking.
 - **Original-Query Retrieval** - Uses the user's question directly; query refinement is disabled to avoid introducing unsupported article references.

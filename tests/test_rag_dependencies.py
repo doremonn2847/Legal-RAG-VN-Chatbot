@@ -54,6 +54,27 @@ class OllamaIntegrationTests(unittest.TestCase):
 
 
 class ArticleLimitTests(unittest.TestCase):
+    def test_uploaded_context_uses_page_citations_and_labels(self):
+        rag = VietnameseLegalRAG.__new__(VietnameseLegalRAG)
+        context = rag.format_context([{'title': 'legal.pdf', 'content': 'Evidence',
+            'metadata': {'source': 'upload', 'filename': 'legal.pdf', 'page': 4}}])
+        self.assertIn('do người dùng cung cấp', context)
+        self.assertIn('legal.pdf, trang 4', context)
+        self.assertNotIn('Điều', context)
+
+    def test_upload_candidates_join_corpus_before_one_rerank(self):
+        rag = VietnameseLegalRAG.__new__(VietnameseLegalRAG)
+        rag.bm25_retriever, rag.vector_store, rag.reranker = MagicMock(), MagicMock(), MagicMock()
+        rag.bm25_retriever.get_relevant_documents.return_value = [{'id': 'law_1', 'score': .5}]
+        rag.vector_store.search_similar_documents.return_value = []
+        upload = {'id': 'upload_1', 'score': .9}
+        rag.reranker.rerank_with_fusion.return_value = [upload]
+        with patch.object(Config, 'USE_SCORE_FUSION', True):
+            result = rag.retrieve_documents('q', use_reranking=True, top_k=5, uploaded_documents=lambda q: [upload])
+        self.assertEqual(result, [upload])
+        self.assertEqual(len(rag.reranker.rerank_with_fusion.call_args.args[1]), 2)
+        rag.reranker.rerank_with_fusion.assert_called_once()
+
     def test_generation_keeps_characters_after_old_limit(self):
         rag = VietnameseLegalRAG.__new__(VietnameseLegalRAG)
         text = "a" * 2100 + "QUYỀN_LỢI" + "b" * 500

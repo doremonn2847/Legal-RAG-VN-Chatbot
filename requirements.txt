@@ -16,3 +16,7 @@ beautifulsoup4
 requests
 underthesea
 tqdm
+docling>=2.60,<3
+torch==2.8.0
+torchvision==0.23.0
+python-multipart>=0.0.18,<1

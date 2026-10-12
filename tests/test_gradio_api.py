@@ -9,6 +9,20 @@ from app import VietnameseLegalChatbot, create_chatbot_interface, main
 
 
 class GradioApiTests(unittest.TestCase):
+    def test_uploaded_sources_show_filename_and_page_without_law_labels(self):
+        page = VietnameseLegalChatbot()._format_retrieved_documents([{
+            'source_type': 'upload', 'filename': '<law>.pdf', 'page': 3,
+            'title': 'law.pdf', 'excerpt': 'Evidence'}])
+        self.assertIn('&lt;law&gt;.pdf', page)
+        self.assertIn('Trang 3', page)
+        self.assertNotIn('Luật:', page)
+
+    def test_document_token_is_sent_only_as_header(self):
+        with patch('app.requests.post', return_value=self.response()) as post:
+            self.chatbot.process_message('q', [], 'conversation-1', 'private-token')
+        self.assertEqual(post.call_args.kwargs['headers']['X-Document-Token'], 'private-token')
+        self.assertNotIn('private-token', str(post.call_args.kwargs['json']))
+
     def test_public_demo_requires_credentials_before_launch(self):
         for password in ("", "short"):
             with patch.dict("os.environ", {"GRADIO_SHARE": "true", "DEMO_USERNAME": "demo", "DEMO_PASSWORD": password}), patch("app.create_chatbot_interface") as create:

@@ -1,41 +1,39 @@
 # Hosted demo deployment on this laptop
 
-The live API/UI now build from the hosted-retrieval checkout. They use DeepSeek Flash, hosted BGE-M3 embeddings, hosted BGE reranking, and the completed `hosted_baai_bge_m3_1024` collection (61,068 articles). The final context remains five articles, with query refinement disabled. Langfuse remains enabled through the private environment file.
+The current API/UI build from **main** in the project checkout. The hosted branch has been merged. The demo uses DeepSeek Flash, hosted BGE-M3 embeddings, hosted BGE reranking and Qdrant Cloud collection `hosted_baai_bge_m3_1024` (61,068 articles). Retrieval uses the original question and final top-5; query refinement is disabled. Private PDF/DOCX uploads and optional Vietnamese full-page OCR are available.
 
-The original main checkout, BM25 file, Qdrant server/storage, and Cloudflare tunnel are retained. Demo credentials are unchanged. The public quick-tunnel URL still depends on this laptop and the existing tunnel process; it is not permanent hosting.
+## Configure and restart
 
-## Restart the hosted demo
+Use `.env` inside the main project directory, not the former worktree. Set `INFERENCE_PROVIDER=deepseek`, `EMBEDDING_PROVIDER=hosted`, `RERANK_PROVIDER=hosted`, BGE-M3 model/dimensions and their private API keys as shown in [hosted retrieval setup](hosted-retrieval.md). Set `QDRANT_CLOUD_URL`/`QDRANT_CLOUD_API_KEY` for Compose and matching `QDRANT_URL`/`QDRANT_API_KEY` for native indexing. BM25 and stopwords remain local trusted files.
 
-Run from `C:/Users/Lenovo/vietnamese-legal-chatbot` in PowerShell:
-
-```powershell
-$dockerExe = 'C:/Users/Lenovo/AppData/Local/Programs/DockerDesktop/resources/bin/docker.exe'
-$hosted = 'C:/Users/Lenovo/.codex/worktrees/hosted-retrieval/vietnamese-legal-chatbot'
-& $dockerExe compose --project-directory $PWD --env-file "$hosted/.env" -p vietnamese-legal-chatbot -f "$hosted/compose.yaml" -f results/hosted-demo.override.yaml up -d --no-deps api ui
+```bash
+docker compose up -d --build api ui
+docker compose ps
+docker compose logs -f api
 ```
 
-The override points image builds to the hosted checkout while the project directory keeps data binds in the original checkout. Do not run the hosted Compose file alone against its worktree: that would select a different Qdrant storage folder. Add `--build` only when source changes require rebuilt images.
+Open [Gradio](http://127.0.0.1:7860/) or [FastAPI docs](http://127.0.0.1:8000/docs). Set `DEMO_USERNAME`/`DEMO_PASSWORD` for UI login. Hosted mode does not require host Ollama. OCR and BM25 still consume laptop CPU; provider calls require network/quota and can incur charges.
 
-## Roll back to the previous local demo
+This laptop currently tags its production images `legal-document-api` and `legal-document-ui` and uses an ignored `results/document-demo.override.yaml` plus restart helper. Those local helpers are not required by a fresh clone; the standard Compose build above uses the same source. Avoid old worktree overrides when rebuilding main.
 
-Old images are tagged before migration. Run from the original checkout:
+## Persistence and stopping
 
-```powershell
-$dockerExe = 'C:/Users/Lenovo/AppData/Local/Programs/DockerDesktop/resources/bin/docker.exe'
-& $dockerExe compose stop -t 30 ui api
-& $dockerExe tag legal-demo-rollback-api:20261012 vietnamese-legal-chatbot-api:latest
-& $dockerExe tag legal-demo-rollback-ui:20261012 vietnamese-legal-chatbot-ui:latest
-& $dockerExe compose up -d --no-build --no-deps api ui
+```bash
+docker compose stop ui api
 ```
 
-This changes only API/UI containers. Both Qdrant collections remain intact. The hosted source is still on its development branch; deployment does not merge it into main or alter Git history.
+Cloud vectors and the corpus BM25 index survive stopping the app. Docling/model caches live in named Docker volumes. Document capability registries are in API memory: restarting the API invalidates upload sessions even though expired chunks are physically cleaned later. Users must re-upload. Clear chat deletes the current session's uploads.
 
-## Limits
+Compose still starts a local Qdrant container through its dependency chain; configured Cloud credentials route the app to Cloud. The old local corpus storage has a known payload-corruption problem in this laptop deployment and should not be used as a fallback. The Cloud corpus was verified separately; unrelated Cloud collections are not deleted by application startup.
 
-The earlier hosted smoke check verified all stages and Langfuse export, but one of two selected legal questions missed its gold reference. A representative evaluation is still needed before claiming quality gains. Hosted services require network availability and provider quota; public usage can incur API charges.
+## Public hosting status
 
-## Verification on 2026-10-12
+Local demo: [http://127.0.0.1:7860/](http://127.0.0.1:7860/). A Cloudflare quick tunnel or Gradio sharing can expose a temporary password-protected UI, but requires the laptop and tunnel to remain running. No currently verified permanent public demo URL is documented.
 
-The hosted API is healthy; authenticated Gradio chat completed through the API. Both local and public `/config` reject unauthenticated requests. A legal request returned five sources and included gold article `58/2010/qh12_13`. Langfuse exported seven observations, including two `deepseek-flash` generations with token usage and no error observations. The image now explicitly installs `langchain`, required by Langfuse's callback.
+The [Hugging Face Space](https://huggingface.co/spaces/doremonn2847/Vietnamese-Legal-Chatbot) exists but is **not operational**. The account's ZeroGPU runtime requires a genuine GPU function; this app is CPU/server-based, and switching to CPU Basic returned a payment-required response. No paid upgrade or artificial GPU function was added. Qdrant Cloud alone does not host the API/UI.
 
-All 15 Gradio unit checks passed. The broader local test discovery stalled during loading and was stopped to free memory; it was not counted as a pass. Verification records are saved under the original checkout's `results/hosted-demo-*-verification.json` (plus `hosted-demo-verification.json`). No full quality benchmark was run for this deployment.
+## Verification
+
+The Cloud corpus contains 61,068 indexed article vectors with rebuilt full payloads verified against the source corpus. The [completed hosted benchmark](hosted-benchmark-comparison.md) evaluates all 3,196 training questions; it is a whole-stack comparison, not held-out answer accuracy. The README Results tables now report this hosted benchmark; the comparison report retains the earlier local-stack scores.
+
+Live document checks verified upload, combined retrieval/reranking, DeepSeek answering, rejected invalid tokens and deletion. Vietnamese OCR on the supplied 13-page PDF repaired the selected Điều 6 heading in 113.2 seconds; other words still contain recognition errors. See [document verification and limits](document-upload-verification.md) and [Langfuse setup](docker-langfuse.md).

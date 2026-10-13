@@ -81,6 +81,14 @@ def test_file_quota_and_raw_file_cleanup(store):
     assert not path.exists()
 
 
+def test_ocr_reaches_pdf_parser_but_not_docx(store):
+    from main.uploaded_documents import extract_document
+    store.add('scan.pdf', b'%PDF-1.4', force_ocr=True)
+    assert extract_document.call_args.kwargs == {'force_ocr': True}
+    store.add('legal.docx', docx_bytes(), force_ocr=True)
+    assert extract_document.call_args.kwargs == {'force_ocr': False}
+
+
 def test_expired_points_are_deleted(store):
     result = store.add('a.pdf', b'%PDF-1.4')
     assert store.client.count(store.collection).count == 1

@@ -1,19 +1,23 @@
 # Docker and Langfuse Cloud
 
-The local stack has three containers: Gradio (`ui`), FastAPI (`api`), and Qdrant.
-Ollama stays on the Windows host so the downloaded Qwen model can be reused.
-Embedding and BGE reranking run on CPU in the API container; there is no Docker
-GPU configuration. Langfuse runs in the Cloud, not in another local container.
+The current main demo runs Gradio (`ui`) and FastAPI (`api`) on the laptop, with
+Qdrant Cloud, hosted BGE-M3/BGE reranking and DeepSeek Flash. BM25, Docling and
+optional Vietnamese OCR run on CPU in the API container. Compose also starts a
+local Qdrant container for compatibility, but Cloud configuration selects the
+remote collections. Langfuse runs in the Cloud. Local Ollama and CPU retrieval
+models remain selectable alternatives; there is no Docker GPU configuration.
 
 ## Start the stack
 
-Start Docker Desktop and Ollama. The existing populated Qdrant storage must be
-in `index/qdrant-server`, BM25 in `index/bm25_index.pkl`, and stopwords in
-`data/utils/stopwords.txt`. Startup never rebuilds the indexes. Stop a native API
+Start Docker Desktop, copy `.env.example` to `.env`, and set provider and
+`QDRANT_CLOUD_*` credentials. The selected Cloud collection must be populated,
+with matching trusted BM25 in `index/bm25_index.pkl` and stopwords in
+`data/utils/stopwords.txt`. Local mode instead requires populated Qdrant storage
+in `index/qdrant-server` and a running host Ollama. Startup never rebuilds the indexes. Stop a native API
 or Gradio process using ports 8000/7860 before starting containers on those ports.
 
 ```powershell
-docker compose up -d --build
+docker compose up -d --build api ui
 docker compose ps
 docker compose logs -f api
 ```
@@ -23,10 +27,12 @@ Only these localhost ports are exposed, even though each container listens on
 all its internal interfaces. The API uses a single worker and rejects concurrent
 questions with 429. Gradio waits for API readiness before starting.
 
-The first build downloads Python dependencies and CPU PyTorch. First API startup
-downloads embedding/reranker weights into the persistent `model-cache` volume;
-this can take several minutes and substantial disk space. Weights are not baked
-into the images. BM25 and stopwords are mounted read-only, while Qdrant keeps its
+The first build downloads Python dependencies, CPU PyTorch and Tesseract with
+Vietnamese language data. Hosted mode does not load local embedding/reranker
+weights. Local mode caches those weights in `model-cache`; Docling layout models
+use persistent `document-cache`. OCR is off by default and enabled per upload.
+Normal parsing has a three-minute subprocess limit; OCR gets ten minutes plus
+cleanup time. API restart invalidates document sessions; users must re-upload. BM25 and stopwords are mounted read-only, while Qdrant keeps its
 existing host storage. The corpus ZIP, results, virtual environment, and `.env`
 are excluded from Docker's build context. Containers run as a non-root user.
 
@@ -39,8 +45,10 @@ API_PORT=8000
 UI_PORT=7860
 ```
 
-Compose overrides `QDRANT_URL` with `http://qdrant:6333` and disables embedded
-storage. `API_BASE_URL` is `http://api:8000` inside Gradio. Native-process settings
+Compose sets `QDRANT_URL` from `QDRANT_CLOUD_URL` (otherwise `http://qdrant:6333`),
+and `QDRANT_API_KEY` from `QDRANT_CLOUD_API_KEY`; embedded storage is disabled.
+Native scripts read `QDRANT_URL`/`QDRANT_API_KEY` directly, so set those too when
+indexing in Cloud. See [hosted setup](hosted-retrieval.md). `API_BASE_URL` is `http://api:8000` inside Gradio. Native-process settings
 remain usable outside containers.
 
 If the API cannot reach host Ollama, test the host gateway from a container.
@@ -70,15 +78,18 @@ docker compose up -d --build api ui
 ```
 
 Integration uses Langfuse Python SDK v4 (verified with 4.17.0) and its LangChain
-`CallbackHandler` for actual Ollama calls. Native API runs also support tracing;
+`CallbackHandler` for actual DeepSeek or Ollama generation calls. Native API runs also support tracing;
 restart the native process after changing `.env`.
 
 One question creates an `answer-legal-question` root observation. Nested steps:
 
-- `classify-legal-domain` (guardrail), with an Ollama generation if LLM detection runs.
+- `classify-legal-domain` (guardrail), with a generation observation if LLM detection runs.
+  Uploaded-document questions bypass this filter.
 - `retrieve-context` (retriever), containing `rerank-context` and its article scores.
-- `generate-response` (chain), containing an Ollama generation with prompt, model,
-  response, parameters and token usage as reported by Ollama.
+- `generate-response` (chain), containing a generation with prompt, model,
+  response, parameters and token usage reported by the configured provider.
+- `index-uploaded-document` (span): file bytes and file/chunk counts; no capability
+  tokens. OCR runs inside the same upload operation.
 
 Original queries, generated answers, selected article IDs, feature settings, timing
 and errors are recorded. The root output is the answer, not a raw response blob.
@@ -97,8 +108,8 @@ dependency. Health checks and rejected busy requests do not generate RAG traces.
 Export-stage masking covers both custom spans and LangChain generation spans. It
 redacts common emails, Vietnamese phone numbers, 12-digit IDs and Langfuse keys.
 This is pattern masking, not complete anonymization: personal names, addresses,
-and unusual number formats may remain. Avoid confidential questions when content
-capture is enabled. Set `LANGFUSE_CAPTURE_CONTENT=false` and restart the API to
+and unusual number formats may remain. Uploaded source text can also appear in generation/retrieval observations.
+Avoid confidential questions or documents when content capture is enabled. Set `LANGFUSE_CAPTURE_CONTENT=false` and restart the API to
 redact observation input/output entirely while retaining timing, model and usage
 data. Application console logs are separate from Langfuse masking.
 
@@ -115,7 +126,8 @@ docker compose up -d api ui
 `stop` preserves containers and all data. Avoid `down -v`, which deletes named
 volumes such as the model cache. Qdrant's host folder is independent of that cache.
 If startup fails, inspect `docker compose logs api` and `/ready`. Verify indexes,
-Ollama model availability, host connectivity and free RAM. Do not run the native
+configured provider/model availability, Cloud credentials, network connectivity
+and free RAM. For local mode also check host Ollama. Do not run the native
 RAG API alongside its container on a memory-constrained laptop.
 
 Tracing follows the official [Langfuse skill](https://github.com/langfuse/skills/tree/main/skills/langfuse),

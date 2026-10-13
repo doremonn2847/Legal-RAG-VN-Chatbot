@@ -8,7 +8,7 @@ import time
 from typing import Annotated, Callable
 
 import anyio
-from fastapi import FastAPI, Header, HTTPException, UploadFile, File
+from fastapi import FastAPI, Header, HTTPException, UploadFile, File, Form
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 from utils.telemetry import Telemetry
@@ -169,7 +169,8 @@ def create_app(rag_factory: Callable = load_pipeline, readiness_probe: Callable 
         return await call_next(request)
 
     @app.post("/documents")
-    async def upload_document(file: Annotated[UploadFile, File()], document_token: DocumentToken = None):
+    async def upload_document(file: Annotated[UploadFile, File()], document_token: DocumentToken = None,
+                              force_ocr: Annotated[bool, Form()] = False):
         try:
             if file.size is not None and file.size > MAX_FILE_BYTES:
                 raise HTTPException(413, "File exceeds 10 MiB")
@@ -185,7 +186,7 @@ def create_app(rag_factory: Callable = load_pipeline, readiness_probe: Callable 
             try:
                 with app.state.rag.telemetry.span("index-uploaded-document", as_type="span",
                     input={"bytes": len(content)} ) as observation:
-                    result = app.state.documents.add(file.filename or "", content, document_token)
+                    result = app.state.documents.add(file.filename or "", content, document_token, force_ocr=force_ocr)
                     Telemetry.update(observation, output={"files": len(result['files']),
                         "chunks": sum(f['chunks'] for f in result['files'])})
                     return result

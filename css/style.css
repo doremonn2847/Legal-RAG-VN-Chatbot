@@ -535,6 +535,19 @@ button[title*="Gửi"],
     100% { transform: translateY(-50%) rotate(360deg); }
 }
 
+/* Keep upload Markdown readable when Gradio selects its dark theme. */
+.gradio-container .upload-help,
+.gradio-container .upload-help *,
+.gradio-container .upload-status,
+.gradio-container .upload-status * {
+    color: var(--text-primary) !important;
+}
+
+.gradio-container .upload-help,
+.gradio-container .upload-status {
+    background: var(--surface-color) !important;
+}
+
 .upload-status {
     border: 1px solid var(--primary-blue);
     border-radius: 8px;

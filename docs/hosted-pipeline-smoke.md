@@ -1,5 +1,12 @@
 # Hosted pipeline smoke check
 
+**Historical check:** the settings and timings below describe the October 12
+development-branch smoke test. The branch is now merged into main; the current
+demo uses Qdrant Cloud, 2,000-character excerpts, private uploads and optional OCR.
+See [current deployment](hosted-demo-deployment.md),
+[completed benchmark](hosted-benchmark-comparison.md) and
+[upload/OCR verification](document-upload-verification.md).
+
 Tested October 12, 2026 on `codex/hosted-retrieval`, using a temporary local API
 on port 8001. The main demo was temporarily stopped to free memory, then restored.
 
@@ -47,5 +54,5 @@ Detailed local artifacts:
 - `C:/Users/Lenovo/vietnamese-legal-chatbot/results/hosted-pipeline-smoke.json`
 - `C:/Users/Lenovo/vietnamese-legal-chatbot/results/hosted-pipeline-trace-audit.json`
 
-The temporary hosted API was stopped after the test. The main demo continues
-using its existing local-model configuration.
+The temporary hosted API was stopped after this historical test. The current
+main demo has since migrated to hosted models and Qdrant Cloud.

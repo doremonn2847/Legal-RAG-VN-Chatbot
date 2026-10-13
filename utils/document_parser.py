@@ -6,28 +6,33 @@ import sys
 import tempfile
 
 
-def extract_document(path):
+def extract_document(path, force_ocr=False):
     with tempfile.TemporaryDirectory() as directory:
         output = Path(directory) / 'sections.json'
         try:
-            subprocess.run([sys.executable, '-m', 'utils.document_parser', str(path), str(output)],
-                           check=True, timeout=180, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run([sys.executable, '-m', 'utils.document_parser', str(path), str(output)]
+                           + (['--ocr'] if force_ocr else []),
+                           check=True, timeout=630 if force_ocr else 180,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except subprocess.TimeoutExpired:
-            raise ValueError('Document processing exceeded three minutes; use a smaller document.') from None
+            raise ValueError('Document processing timed out; use a smaller document.') from None
         except subprocess.CalledProcessError:
-            raise ValueError('Cannot read this document. Use a valid text PDF/DOCX with at most 50 PDF pages.') from None
+            raise ValueError('Cannot read this document. Use a valid PDF/DOCX with at most 50 PDF pages; scanned PDFs need OCR.') from None
         return json.loads(output.read_text(encoding='utf-8'))
 
 
-def convert(path):
+def convert(path, force_ocr=False):
     from docling.datamodel.accelerator_options import AcceleratorDevice, AcceleratorOptions
     from docling.datamodel.base_models import InputFormat, ConversionStatus
-    from docling.datamodel.pipeline_options import PdfPipelineOptions
+    from docling.datamodel.pipeline_options import PdfPipelineOptions, TesseractCliOcrOptions
     from docling.document_converter import DocumentConverter, PdfFormatOption
 
-    options = PdfPipelineOptions(do_ocr=False, do_table_structure=False,
-                                 document_timeout=150,
+    force_ocr = force_ocr and path.suffix.lower() == '.pdf'
+    options = PdfPipelineOptions(do_ocr=force_ocr, do_table_structure=False,
+                                 document_timeout=600 if force_ocr else 150,
                                  accelerator_options=AcceleratorOptions(device=AcceleratorDevice.CPU, num_threads=2))
+    if force_ocr:
+        options.ocr_options = TesseractCliOcrOptions(lang=['vie', 'eng'], force_full_page_ocr=True)
     converter = DocumentConverter(allowed_formats=[InputFormat.PDF, InputFormat.DOCX],
         format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=options)})
     result = converter.convert(path, max_num_pages=50, max_file_size=10*1024*1024)
@@ -46,4 +51,4 @@ def convert(path):
 
 
 if __name__ == '__main__':
-    Path(sys.argv[2]).write_text(json.dumps(convert(Path(sys.argv[1])), ensure_ascii=False), encoding='utf-8')
+    Path(sys.argv[2]).write_text(json.dumps(convert(Path(sys.argv[1]), '--ocr' in sys.argv[3:]), ensure_ascii=False), encoding='utf-8')

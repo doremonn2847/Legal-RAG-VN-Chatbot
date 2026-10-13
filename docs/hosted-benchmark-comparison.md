@@ -1,6 +1,6 @@
-# Hosted retrieval benchmark — pending README review
+# Hosted retrieval benchmark and previous-stack comparison
 
-All 3,196 labeled training questions completed. The evaluation uses original queries, 25 BM25 and 25 dense candidates, exact gold article IDs, and final top-5. It makes no answer-generation, classification, refinement or web-search calls. Per-question checkpoints and manifests remain in `results/hosted-full-article-top5/` locally. README Results have not been replaced.
+All 3,196 labeled training questions completed. The evaluation uses original queries, 25 BM25 and 25 dense candidates, exact gold article IDs, and final top-5. It makes no answer-generation, classification, refinement or web-search calls. Per-question checkpoints and manifests remain in `results/hosted-full-article-top5/` locally. The README Results tables now present this hosted benchmark following user approval; the previous stack is retained below for comparison.
 
 ## Current stack
 

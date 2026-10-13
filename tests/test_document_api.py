@@ -16,7 +16,7 @@ def test_upload_ask_and_delete_use_private_document_token():
         response = client.post('/documents', files={'file': ('legal.pdf', b'%PDF-1.4')})
         assert response.status_code == 200
         assert response.json()['token'] == token
-        documents.add.assert_called_once_with('legal.pdf', b'%PDF-1.4', None)
+        documents.add.assert_called_once_with('legal.pdf', b'%PDF-1.4', None, force_ocr=False)
         response = client.post('/ask', json={'question': 'Nghỉ phép?'}, headers={'X-Document-Token': token})
         assert response.status_code == 200
         assert response.json()['sources'][0]['page'] == 2

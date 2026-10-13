@@ -20,7 +20,7 @@ RUN --mount=type=cache,target=/root/.cache/pip pip install torch==2.8.0 --index-
 RUN --mount=type=cache,target=/root/.cache/pip pip install torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cpu
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
-RUN apt-get update && apt-get install -y --no-install-recommends libglib2.0-0 \
+RUN apt-get update && apt-get install -y --no-install-recommends libglib2.0-0 tesseract-ocr tesseract-ocr-vie \
     && rm -rf /var/lib/apt/lists/*
 COPY api.py config.py ./
 COPY main ./main

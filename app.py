@@ -71,7 +71,7 @@ class VietnameseLegalChatbot:
         history.extend([{"role": "user", "content": question}, {"role": "assistant", "content": answer}])
         return history, docs, status
 
-    def upload_document(self, filepath, token=None):
+    def upload_document(self, filepath, token=None, force_ocr=False):
         if not filepath:
             return "⚠️ Chọn tệp PDF/DOCX trước.", token
         try:
@@ -81,7 +81,8 @@ class VietnameseLegalChatbot:
             with path.open('rb') as handle:
                 response = requests.post(self.api_base_url + '/documents',
                     files={'file': (path.name, handle)},
-                    headers={'X-Document-Token': token} if token else {}, timeout=(5, 210))
+                    data={'force_ocr': str(bool(force_ocr)).lower()},
+                    headers={'X-Document-Token': token} if token else {}, timeout=(5, 660 if force_ocr else 210))
             response.raise_for_status()
             result = response.json()
             files = ', '.join(escape(f['filename']) for f in result['files'])
@@ -257,9 +258,11 @@ def create_chatbot_interface():
             
             # Right sidebar - Reference documents (expanded)
             with gr.Column(scale=3, min_width=350):
-                gr.Markdown("### 📎 Thêm tài liệu pháp lý\nPDF/DOCX: tối đa 10 MiB/tệp, 50 trang PDF, 3 tệp/phiên. PDF cần có văn bản; chưa hỗ trợ OCR.\n\nKhi bấm xử lý, nội dung sẽ được gửi tới dịch vụ embedding, reranking và mô hình trả lời. Tài liệu riêng cho phiên này, tự hết hạn sau 24 giờ.")
+                gr.Markdown("### 📎 Thêm tài liệu pháp lý\nPDF/DOCX: tối đa 10 MiB/tệp, 50 trang PDF, 3 tệp/phiên. PDF scan hoặc lỗi dấu: bật OCR bên dưới.\n\nKhi bấm xử lý, nội dung sẽ được gửi tới dịch vụ embedding, reranking và mô hình trả lời. Tài liệu riêng cho phiên này, tự hết hạn sau 24 giờ.", elem_classes="upload-help")
                 upload_status = gr.Markdown("Chưa có tài liệu tải lên.", elem_classes="upload-status")
                 upload_file = gr.File(label="Chọn tài liệu", file_types=['.pdf', '.docx'], type='filepath')
+                upload_ocr = gr.Checkbox(label="PDF scan / sửa văn bản lỗi bằng OCR tiếng Việt", value=False)
+                gr.Markdown("OCR đọc lại ảnh trang PDF, có thể mất đến 10 phút. Hãy kiểm tra số điều, ngày và nội dung với bản gốc. DOCX không dùng OCR.", elem_classes="upload-help")
                 upload_button = gr.Button("📥 Xử lý tài liệu", size='sm')
                 # Enhanced documents display
                 docs_display = gr.Markdown(
@@ -285,14 +288,15 @@ def create_chatbot_interface():
                 raise gr.Error("Không xóa được tài liệu. Vui lòng thử lại; phiên vẫn được giữ.") from None
             return [], "", "💬 Nhập câu hỏi để bắt đầu", uuid.uuid4().hex, None, "Chưa có tài liệu tải lên.", None
 
-        def handle_upload(filepath, token):
+        def handle_upload(filepath, token, force_ocr=False):
             if filepath:
-                yield ("⏳ **Đang xử lý tài liệu…**\n\nĐang đọc văn bản và lập chỉ mục. PDF đầu tiên có thể mất vài phút; chờ thông báo hoàn tất trước khi hỏi.",
+                detail = "Đang OCR tiếng Việt từ ảnh trang và lập chỉ mục; có thể mất đến 10 phút." if force_ocr else "Đang đọc văn bản và lập chỉ mục. PDF đầu tiên có thể mất vài phút."
+                yield ("⏳ **Đang xử lý tài liệu…**\n\n" + detail + " Chờ thông báo hoàn tất trước khi hỏi.",
                        token, gr.update(value="⏳ Đang xử lý…", interactive=False))
-            status, next_token = chatbot.upload_document(filepath, token)
+            status, next_token = chatbot.upload_document(filepath, token, force_ocr=force_ocr)
             yield status, next_token, gr.update(value="📥 Xử lý tài liệu", interactive=True)
 
-        upload_button.click(handle_upload, inputs=[upload_file, document_token],
+        upload_button.click(handle_upload, inputs=[upload_file, document_token, upload_ocr],
                             outputs=[upload_status, document_token, upload_button], show_progress="hidden")
 
         # Wire up sample question buttons

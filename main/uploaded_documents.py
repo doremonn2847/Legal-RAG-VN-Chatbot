@@ -44,7 +44,7 @@ def chunk_sections(sections):
         if len(chunks) > 300:
             raise ValueError('Document exceeds the 300-chunk session limit.')
     if not chunks:
-        raise ValueError('No readable text found. Scanned PDFs need OCR, which is not enabled.')
+        raise ValueError('No readable text found. Enable OCR for scanned PDFs.')
     return chunks
 
 
@@ -82,7 +82,7 @@ class UploadedDocuments:
             if field not in info.payload_schema:
                 self.client.create_payload_index(self.collection, field, schema, wait=True)
 
-    def add(self, filename, content, token=None):
+    def add(self, filename, content, token=None, force_ocr=False):
         validate_file(filename, content)
         self.cleanup()
         if token:
@@ -98,7 +98,7 @@ class UploadedDocuments:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / ('document' + Path(filename).suffix.lower())
             path.write_bytes(content)
-            chunks = chunk_sections(extract_document(path))
+            chunks = chunk_sections(extract_document(path, force_ocr=force_ocr and path.suffix == '.pdf'))
         if session['chunks'] + len(chunks) > 300:
             raise ValueError('Documents exceed the 300-chunk session limit.')
         vectors = self.vector.embedding_model.encode([c['text'] for c in chunks], batch_size=16)

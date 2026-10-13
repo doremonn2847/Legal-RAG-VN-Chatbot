@@ -10,4 +10,12 @@ Verified on 13 October 2026:
 - Local production demo restored on port 7860 with Qdrant Cloud. Authenticated UI configuration includes the upload control; a DOCX upload and deletion both returned 200 from the built API image.
 - Fresh review identified failed-rollback visibility and interrupted-index repair risks; both were fixed and covered by regression tests, including the strict Cloud cleanup retry path.
 
-Limits: this verifies small text documents, not scanned-PDF OCR, complex table fidelity, hostile-parser containment, concurrent public traffic or HF hosting. The example document explicitly identifies itself as test material, not law. Upload testing does not change the corpus benchmark or README Results.
+Limits: this verifies small text documents, not complex table fidelity, hostile-parser containment, concurrent public traffic or HF hosting. The example document explicitly identifies itself as test material, not law. Upload testing does not change the corpus benchmark or README Results.
+
+## Vietnamese OCR check (2026-10-13)
+
+Forced full-page Tesseract OCR (`vie` + `eng`) processed the supplied 13-page `06.2026.TT-TTCP.PDF` on CPU in 113.2 seconds and produced 213 text sections. Page 4's embedded text `Diu 6. Ung x trong thirc hin van hóa cong so'` became `Điều 6. Ứng xử trong thực hiện văn hóa công sở`, with page provenance retained. The broken heading did not survive in the OCR result. Other words still show recognition errors; this is a targeted check, not a document-wide accuracy measurement. Extracted evidence is saved locally under ignored `results/ocr-legal-sections.json`.
+
+Focused tests cover API boolean validation, UI forwarding/status/timeouts, bounded parser execution, full-page Vietnamese OCR options, and DOCX retaining normal extraction. Tesseract and Vietnamese language data are installed in the API image; the existing legal corpus is not reindexed.
+
+The deployed API also accepted an image-only PDF made from page 4 with `force_ocr=true`, extracted and indexed 16 chunks in Qdrant Cloud in 34.9 seconds, and successfully deleted that test session afterward. The deployed Gradio checkbox was verified visible and selectable. All 16 focused document/OCR tests and 19 existing Gradio tests passed.

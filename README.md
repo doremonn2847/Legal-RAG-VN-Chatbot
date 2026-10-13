@@ -9,7 +9,7 @@ A Retrieval-Augmented Generation (RAG) system designed to answer legal questions
 ## **Features**
 
 - **Hybrid RAG Architecture** - Combines BGE-M3 dense retrieval with local BM25 keyword search over 61,068 articles.
-- **Original-Query Retrieval** - Uses the user's question directly; query refinement is disabled to avoid introducing unsupported article references.
+- **Raw Retrieval** - Uses the user's question directly; experiments favored disabling query refinement, which could introduce unsupported article references.
 - **Top-5 Evidence** - Retrieves 25 sparse and 25 dense candidates, deduplicates them, and selects five sources after BGE reranking and score fusion.
 - **Hosted Models** - Uses DeepSeek Flash through `langchain-deepseek`, hosted BGE-M3 embeddings, and hosted BGE reranking to reduce laptop inference work. Local Ollama/Qwen and local retrieval models remain selectable alternatives.
 - **Private Document Uploads** - Adds PDF/DOCX sources through Docling, with filename/page citations, session isolation and automatic 24-hour expiry.

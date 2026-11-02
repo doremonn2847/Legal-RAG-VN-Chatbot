@@ -11,7 +11,7 @@ A Retrieval-Augmented Generation (RAG) system designed to answer legal questions
 - **Hybrid RAG Architecture** - Combines BGE-M3 dense retrieval with local BM25 keyword search over 61,068 articles.
 - **Raw Retrieval** - Uses the user's question directly; experiments favored disabling query refinement, which could introduce unsupported article references.
 - **Top-5 Evidence** - Retrieves 25 sparse and 25 dense candidates, deduplicates them, and selects five sources after BGE reranking and score fusion.
-- **Hosted Models** - Uses DeepSeek Flash through `langchain-deepseek`, hosted BGE-M3 embeddings, and hosted BGE reranking to reduce laptop inference work. Local Ollama/Qwen and local retrieval models remain selectable alternatives.
+- **Inference Models** - Uses DeepSeek Flash through `langchain-deepseek`, hosted BGE-M3 embeddings, and hosted BGE reranking to reduce laptop inference work. Local Ollama/Qwen and local retrieval models remain selectable alternatives.
 - **Private Document Uploads** - Adds PDF/DOCX sources through Docling, with filename/page citations, session isolation and automatic 24-hour expiry.
 - **Vietnamese OCR** - Optionally re-reads scanned PDFs or broken selectable text using full-page Tesseract OCR. Processing and completion messages remain visible. See [upload limits and setup](docs/document-uploads.md).
 - **FastAPI + Gradio** - Serves questions and uploads through a validated HTTP API and password-protected chat UI.
@@ -136,8 +136,6 @@ Hybrid + BGE reaches **90.81% Recall@5**, improving over BM25 by **20.61 percent
 *Timings cover retrieval and reranking with hosted services, including their network calls. The 1.6646-second mean is not complete chatbot response time; DeepSeek answer generation is excluded.*
 
 *These are training-set retrieval measurements, not held-out accuracy, generated-answer quality, current-law validity or uploaded-document/OCR evaluation. The previous and current stacks changed embedding models, article truncation and compute/provider locations together; this comparison does not isolate the cause of the gain. Latency is not directly comparable with the earlier Kaggle hardware.*
-
-See the [hosted benchmark and previous-stack comparison](docs/hosted-benchmark-comparison.md) for the full tables, protocol and limitations. Per-question checkpoints and manifests remain locally under `results/hosted-full-article-top5/`; raw results are excluded from Git. Historical [Qwen answer-generation measurements](https://github.com/doremonn2847/Legal-RAG-VN-Chatbot/blob/0951fd2d501e594956dca44dd55620f72e43e237/docs/qwen-full-run-review.md) apply to that earlier model run, not the current DeepSeek deployment.
 
 ## **Installation**
 
